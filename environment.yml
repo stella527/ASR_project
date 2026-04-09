@@ -1,0 +1,17 @@
+name: eel-env
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - eelbrain
+  - ctc-segmentation
+  - pytorch
+  - torchaudio
+  - librosa
+  - pip:
+    - transformers
+    - eng-to-ipa
+    - phonemizer
+    - pandas
+    - numpy
+prefix: C:\Users\stell\miniconda3\envs\eel-env
