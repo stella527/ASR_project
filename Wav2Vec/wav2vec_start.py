@@ -297,4 +297,49 @@ def process_shift( og_waveform, ms, sr, output_folder, processor, model, decodin
 
     return round_df
 
+def align_words(df,word_columns, timing_map, reference_col="word", window=3):
+    
+    aligned_rows = []
 
+    # lowercase version for matching
+    df_words = df[word_columns].applymap(lambda x: str(x).lower() if isinstance(x, str) else '')
+    df_ref = df[reference_col].apply(lambda x: str(x).lower() if isinstance(x, str) else '')
+
+    for i, ref_word in df_ref.items():
+        if not ref_word:
+            continue
+
+        match_info = {'word': df.at[i, reference_col], 
+                      'start': df.at[i, 'start'], 
+                        'end': df.at[i, 'end']}
+        all_found = True
+
+        
+        for col in word_columns:
+
+            # check same row first
+            if df_words.at[i, col] == ref_word:
+                idx_match = i
+            else:
+                # search window
+                window_start = max(0, i - window)
+                window_end = min(len(df), i + window + 1)
+                window_rows = df_words[col].iloc[window_start:window_end]
+                found_rows = window_rows[window_rows == ref_word]
+                if len(found_rows) == 0:
+                    all_found = False
+                    break
+                idx_match = found_rows.index[0]
+
+            # add timing info for this column
+            if col in timing_map:
+                for timing_col in timing_map[col]:
+                    match_info[timing_col] = df.at[idx_match, timing_col]
+            else: 
+                print("Check timing map and cross reference the columns in df")
+
+        if all_found:
+            aligned_rows.append(match_info)
+    aligned_df = pd.DataFrame(aligned_rows).reset_index(drop=True)
+    
+    return aligned_df
