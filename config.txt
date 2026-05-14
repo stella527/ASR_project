@@ -1,0 +1,5 @@
+audio_folder = C:/Users/stell/Desktop/LLM_PROJ/Female_Single_Speakers
+nemo_only = /export/salumona/LLM_PROJ/Female_Single_Speakers
+shift_start=-20
+shift_end=20
+shift_step=5

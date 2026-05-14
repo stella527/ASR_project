@@ -14,7 +14,6 @@ import re
 import json
 
 
-
 """"""
 
 arpabet2ipa = {
@@ -148,32 +147,32 @@ tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(phoneme_model_name)
 phoneme_processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer = tokenizer)
 
 
-# output_folder = "Wav2Vec_Shifted"
-# audio_folder = "Female_Single_Speakers"
+
+# config = {}
+
+# with open("config.txt", "r") as f:
+#     for line in f:
+#         # Skip empty lines or comments
+#         if "=" in line:
+#             name, value = line.split("=", 1)
+#             config[name.strip()] = value.strip()
+
+# # Call them
+# audio_folder = config["audio_folder"]
 
 
-config = {}
+# # read times
+# start = int(config["shift_start"])
+# end = int(config["shift_end"])
+# step = int(config["shift_step"])
 
-with open("config.txt", "r") as f:
-    for line in f:
-        # Skip empty lines or comments
-        if "=" in line:
-            name, value = line.split("=", 1)
-            config[name.strip()] = value.strip()
-
-# Call them
-audio_folder = config["audio_folder"]
-
-
-# read times
-start = int(config["shift_start"])
-end = int(config["shift_end"])
-step = int(config["shift_step"])
-
-shift_range = list(range(start, end + 1, step))
+# shift_range = list(range(start, end + 1, step))
 
 os.makedirs("Wav2Vec2_all_shifts", exist_ok=True)
 output_folder = "Wav2Vec2_all_shifts"
+
+shifted_dir = os.path.join(output_folder, "Shifted_Audio")
+os.makedirs(shifted_dir, exist_ok=True)
 
 
 
@@ -230,30 +229,26 @@ def decoding_to_timings(transcription, predicted_ids, input_values, processor,
 
     return df
 
-def shift_audio(og_waveform, shift_ms, sr):
+# def shift_audio(og_waveform, shift_ms, sr):
     
-    shift_samples = int(sr * (shift_ms / 1000.0))
+#     shift_samples = int(sr * (shift_ms / 1000.0))
 
-    if og_waveform.dim() == 1:
-        og_waveform = og_waveform.unsqueeze(0)
+#     if og_waveform.dim() == 1:
+#         og_waveform = og_waveform.unsqueeze(0)
         
-    if shift_samples > 0:
-        shifted = torch.cat([torch.zeros(1, shift_samples), og_waveform[:, :-shift_samples]], dim=1)
-    elif shift_samples < 0:
-        shifted = torch.cat([og_waveform[:, -shift_samples:], torch.zeros(1, -shift_samples)], dim=1)
-    else:
-        shifted = og_waveform
-    return shifted
+#     if shift_samples > 0:
+#         shifted = torch.cat([torch.zeros(1, shift_samples), og_waveform[:, :-shift_samples]], dim=1)
+#     elif shift_samples < 0:
+#         shifted = torch.cat([og_waveform[:, -shift_samples:], torch.zeros(1, -shift_samples)], dim=1)
+#     else:
+#         shifted = og_waveform
+#     return shifted
 
 
-def process_shift( og_waveform, ms, sr, output_folder, processor, model, decoding_to_timings):
-
-
-    #assert (not np.all(shifted_audio.detach().cpu().numpy() == og_waveform.detach().cpu().numpy().flatten()))
-    shifted_audio = shift_audio(og_waveform, ms, sr)
+def process_shift(shifted_audio, ms, sr, processor, model, decoding_to_timings):
     
      # Create file path for the shifted version
-    base_name = f"{output_folder}/audio_shift_{ms}ms.wav"
+    base_name = os.path.join(shifted_dir, f"audio_shift_{ms}ms.wav")
 
     # Save the shifted version
     torchaudio.save(base_name, shifted_audio, sr)
@@ -297,49 +292,88 @@ def process_shift( og_waveform, ms, sr, output_folder, processor, model, decodin
 
     return round_df
 
-def align_words(df,word_columns, timing_map, reference_col="0ms_word", window=3):
+# def align_words(df,word_columns, timing_map, reference_col="0ms_word", window=3):
     
-    aligned_rows = []
+#     aligned_rows = []
 
-    # lowercase version for matching
-    df_words = df[word_columns].applymap(lambda x: str(x).lower() if isinstance(x, str) else '')
-    df_ref = df[reference_col].apply(lambda x: str(x).lower() if isinstance(x, str) else '')
+#     # lowercase version for matching
+#     df_words = df[word_columns].apply(lambda col: col.map(lambda x: str(x).lower() if isinstance(x, str) else ''))
+#     df_ref = df[reference_col].apply(lambda x: str(x).lower() if isinstance(x, str) else '')
 
-    for i, ref_word in df_ref.items():
-        if not ref_word:
-            continue
+#     for i, ref_word in df_ref.items():
+#         if not ref_word:
+#             continue
 
-        match_info = {'word': df.at[i, reference_col], 
-                      'start': df.at[i, '0ms_start'], 
-                        'end': df.at[i, '0ms_end']}
-        all_found = True
+#         match_info = {'word': df.at[i, reference_col], 
+#                       'start': df.at[i, '0ms_start'], 
+#                         'end': df.at[i, '0ms_end']}
+#         all_found = True
 
         
-        for col in word_columns:
+#         for col in word_columns:
 
-            # check same row first
-            if df_words.at[i, col] == ref_word:
-                idx_match = i
-            else:
-                # search window
-                window_start = max(0, i - window)
-                window_end = min(len(df), i + window + 1)
-                window_rows = df_words[col].iloc[window_start:window_end]
-                found_rows = window_rows[window_rows == ref_word]
-                if len(found_rows) == 0:
-                    all_found = False
-                    break
-                idx_match = found_rows.index[0]
+#             # check same row first
+#             if df_words.at[i, col] == ref_word:
+#                 idx_match = i
+#             else:
+#                 # search window
+#                 window_start = max(0, i - window)
+#                 window_end = min(len(df), i + window + 1)
+#                 window_rows = df_words[col].iloc[window_start:window_end]
+#                 found_rows = window_rows[window_rows == ref_word]
+#                 if len(found_rows) == 0:
+#                     all_found = False
+#                     break
+#                 idx_match = found_rows.index[0]
 
-            # add timing info for this column
-            if col in timing_map:
-                for timing_col in timing_map[col]:
-                    match_info[timing_col] = df.at[idx_match, timing_col]
-            else: 
-                print("Check timing map and cross reference the columns in df")
+#             # add timing info for this column
+#             if col in timing_map:
+#                 for timing_col in timing_map[col]:
+#                     match_info[timing_col] = df.at[idx_match, timing_col]
+#             else: 
+#                 print("Check timing map and cross reference the columns in df")
 
-        if all_found:
-            aligned_rows.append(match_info)
-    aligned_df = pd.DataFrame(aligned_rows).reset_index(drop=True)
+#         if all_found:
+#             aligned_rows.append(match_info)
+#     aligned_df = pd.DataFrame(aligned_rows).reset_index(drop=True)
     
-    return aligned_df
+#     return aligned_df
+
+
+# def find_shift(df):
+#     new_df = []
+#     for idx, row in df.iterrows():
+    
+#         #First, check if all words for each time shift is present
+#         first_value = row.iloc[1]
+        
+#         count = 0
+    
+#         for col_name, col_value in row.items():
+#             if col_name.endswith("start"):
+#                 if col_value == first_value:
+#                     #print(f"Word: {row[0]}, Time: {col_value}, No change")
+#                     count += 1
+#                 else:
+#                     num = int(re.search(r"-?\d+", col_name).group())
+#                     #print(f"Word: {row[0]}, Shift: {-1 * count} or {num}, Time: {col_value}")
+    
+#                     #Subtract the offset from the shifted time
+#                     new_time = col_value - (num/1000)
+                    
+#                     new_df.append({
+#                     "Word": row.iloc[0],
+#                     "Start": round(new_time, 3)
+#                     })
+                    
+#                     break
+#         else:
+#              #print(f"Word: {row[0]}, Time: {col_value}, No change")
+#              new_df.append({
+#                     "Word": row[0],
+#                     "Start": round(col_value, 3)
+#                     })
+#                 #print(col_name, col_value)
+    
+#     df = pd.DataFrame(new_df)
+#     return df

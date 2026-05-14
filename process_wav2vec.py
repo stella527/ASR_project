@@ -1,23 +1,48 @@
-import wav2vec_start 
 import os
 import pandas as pd
-
 import torchaudio
-
 import soundfile as sf
 from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Processor, Wav2Vec2ForCTC,  Wav2Vec2CTCTokenizer
 
-from wav2vec_start  import shift_audio
+#Local functions
+import general
+import wav2vec_start
+
+from general  import shift_audio
+from general import combine_transcription
+from general import align_words
+from general import split_shifted_dfs
+from general import final_timestamps
+
 from wav2vec_start  import process_shift
 from wav2vec_start  import decoding_to_timings
 
-audio_folder = wav2vec_start.audio_folder
-shift_ms = wav2vec_start.shift_range
-shifted_dfs = {}
 
+audio_folder = general.audio_folder
+shift_ms = general.shift_range
 
 output_folder = wav2vec_start.output_folder
 
+
+#######################
+# Timing map for shifting
+# Include in each model
+#########################
+
+word_columns = []
+timing_map = {}
+for i in shift_ms:
+    word_columns.append((f"{i}ms_word"))
+    timing_map[f"{i}ms_word"] = [f"{i}ms_start", f"{i}ms_end"]
+
+
+reference_col = '0ms_word'  # Original timing
+window_size = 5
+############
+#End
+
+
+shifted_dfs = {}
 
 for wav in os.listdir(audio_folder):
 
@@ -25,6 +50,7 @@ for wav in os.listdir(audio_folder):
 
         #Get the name without the extension
         base = os.path.splitext(wav)[0]
+
         #Split each word in the name
         speaker_type = base.split("_")[0]
 
@@ -32,8 +58,8 @@ for wav in os.listdir(audio_folder):
         audio_path = os.path.join(audio_folder, wav)
         
         og_waveform, sr = torchaudio.load(audio_path)
-        #og_waveform, sr = sf.read(audio_path)
-        print("Trying to load:", audio_path)
+        
+        print("Loading:", audio_path)
 
         speaker_dir = os.path.join(output_folder, speaker_type)
         os.makedirs(speaker_dir, exist_ok=True)
@@ -50,21 +76,18 @@ for wav in os.listdir(audio_folder):
                 shifted_dfs[f"Shift_{speaker_type}_{ms}ms"] = pd.read_csv(output_file)
                 continue
 
-             shifted_audio = shift_audio(og_waveform, ms, sr)
+             shifted_audio = shift_audio(og_waveform, output_folder, ms, sr)
         
         
              shifted_df = process_shift(
                 shifted_audio,
                 ms,
                 sr,
-                output_folder,
                 wav2vec_start.processor,
                 wav2vec_start.model,
                 decoding_to_timings)
 
-             shifted_df.to_csv(
-            os.path.join(speaker_dir, f"{speaker_type}_{ms}ms.csv"),
-            index=False)
+             shifted_df.to_csv(os.path.join(speaker_dir, f"{speaker_type}_{ms}ms.csv"), index=False)
             
             # store in dict with a unique key
              shifted_dfs[f"Shift_{speaker_type}_{ms}ms"] = shifted_df
@@ -72,3 +95,13 @@ for wav in os.listdir(audio_folder):
              print(f"Finished {speaker_type}_{ms}ms")
 
 
+combined_df = combine_transcription(shifted_dfs)
+
+sorted_df = align_words(combined_df, word_columns, timing_map, reference_col="0ms_word", window=3)
+
+sorted_df.to_csv(f"{output_folder}/Wav2vec_combined_sorted.csv", index=False)
+
+#Split into negative and positive
+neg_pos_df = split_shifted_dfs(sorted_df)
+
+final_timestamps = final_timestamps(neg_pos_df, output_folder)
