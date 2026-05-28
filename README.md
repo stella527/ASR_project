@@ -13,9 +13,10 @@ Here is how to set up the environment to use these tools
    ```
 
 2. Create the Conda environment from the YAML file:
-
+ ```sh
    conda env create -f environment.yml
-
+ ```
 3. Activate the environment:
-
+ ```sh
   conda activate <environment-name>
+ ```
