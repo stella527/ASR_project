@@ -1,5 +1,0 @@
-transformers
-eng-to-ipa
-phonemizer
-pandas
-numpy
